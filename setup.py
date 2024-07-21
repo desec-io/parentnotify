@@ -13,7 +13,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/desec-io/parentnotify",
     packages=setuptools.find_packages(),
-    install_requires=['dnspython>=2.6.1'],
+    install_requires=['dnspython@git+https://github.com/peterthomassen/dnspython@20240720_DSYNC'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
