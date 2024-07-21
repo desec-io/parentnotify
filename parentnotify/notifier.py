@@ -91,11 +91,17 @@ class Notifier(NotifierBase):
 
         # Attempt one address at a time and break on success.
         excs = []
-        for *socket_kwargs, _, sockaddr in addrinfo:
+        for *_, (where, *_) in addrinfo:
             try:
-                sock = socket.socket(*socket_kwargs)
-                send_udp(sock, what=msg, destination=sockaddr)
-                break
+                timeout = 3
+                for i in reversed(range(3)):
+                    try:
+                        return dns.query.udp(msg, where, timeout=timeout)
+                    except dns.exception.Timeout:
+                        if i:
+                            timeout += 1
+                            continue
+                        raise
             except Exception as e:
                 excs.append(e)
         else:
