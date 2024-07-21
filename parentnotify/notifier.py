@@ -1,5 +1,6 @@
 import socket
 
+import dns.flags
 import dns.name
 import dns.rdatatype
 import dns.resolver
@@ -14,9 +15,15 @@ from parentnotify.base import NotifierBase
 class Notifier(NotifierBase):
     rrtype: str
     domains: list
+    resolver: dns.resolver.Resolver
+    insecure: bool
 
-    def __init__(self, rrtype, domains, *args, **kwargs):
+    def __init__(self, rrtype, domains, resolver, insecure, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.resolver = dns.resolver.Resolver()
+        if resolver:
+            self.resolver.nameservers = [resolver]
+        self.insecure = insecure
         self.rrtype = dns.rdatatype.from_text(rrtype)
         self.domains = map(dns.name.from_text, domains)
 
@@ -33,8 +40,10 @@ class Notifier(NotifierBase):
 
         try:
             self.logger.debug(f"Querying DSYNC for {qname}")
-            answers = dns.resolver.resolve(qname, "DSYNC")
-            # TODO check AD bit
+            answers = self.resolver.query(qname, "DSYNC")
+            if not self.insecure and dns.flags.AD not in answers.response.flags:
+                self.logger.warning(f"{qname}/DSYNC has AD=0, ignoring")
+                return
             for answer in answers:
                 if answer.scheme == 1 and answer.rrtype == self.rrtype:
                     return (answer.target, answer.port)
@@ -42,9 +51,16 @@ class Notifier(NotifierBase):
             if parent is dns.name.empty:
                 return
             if parent is None:
-                return self.discover_notify_endpoint(
-                    domain, e.response(qname).authority[0].name
-                )
+                response = e.response(qname)
+                if not self.insecure and dns.flags.AD not in response.flags:
+                    self.logger.warning(f"{qname}/NXDOMAIN has AD=0, ignoring")
+                    return
+                try:
+                    parent = response.authority[0].name
+                except IndexError:
+                    self.logger.debug(f"{qname}/NXDOMAIN lacks SOA record, giving up")
+                    return
+                return self.discover_notify_endpoint(domain, parent)
             return self.discover_notify_endpoint(
                 dns.name.Name(("_dsync",)) + parent, dns.name.empty
             )

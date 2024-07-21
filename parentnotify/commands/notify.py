@@ -19,6 +19,16 @@ def main():
         nargs="+",
     )
     parser.add_argument(
+        "--resolver",
+        help="type of notification to send (CDS)",
+        type=str,
+    )
+    parser.add_argument(
+        "--insecure",
+        help="do not check AD bit on DSYNC lookups",
+        action="store_true",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="logging verbosity (default: 0)",
@@ -27,7 +37,9 @@ def main():
     )
     args = parser.parse_args()
 
-    notifier = Notifier(args.rrtype, args.domain, log_level=args.verbose)
+    notifier = Notifier(
+        args.rrtype, args.domain, args.resolver, args.insecure, log_level=args.verbose
+    )
     notifier.process()
 
 
